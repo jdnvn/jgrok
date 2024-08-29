@@ -52,7 +52,8 @@ func handler(w http.ResponseWriter, r *http.Request) {
 
         // Register new WebSocket client
         client := &Client{conn: ws}
-		id, _ := gonanoid.New()
+		nanoId, _ := gonanoid.New()
+		id := strings.ToLower(nanoId)
         clients[id] = client
 		log.Println("New client:", id)
 
@@ -113,7 +114,7 @@ func handler(w http.ResponseWriter, r *http.Request) {
 			w.Write([]byte("internal server error :("))
 			return
 		}
-	
+
 		// Set the HTTP response status and headers
 		w.WriteHeader(forwardedResp.StatusCode)
 		for key, values := range forwardedResp.Headers {
