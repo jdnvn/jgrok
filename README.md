@@ -1,2 +1,2 @@
 # jgrok
-my own implementation ngrok, from scratch
+my own implementation of ngrok, from scratch
