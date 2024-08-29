@@ -65,8 +65,7 @@ func handler(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusNotFound)
 			return
 		}
-		id := split_host[0]
-		id = strings.toLower(id)
+		id := strings.ToLower(split_host[0])
 		log.Println("Incoming request to id:", id)
 
 		client, exists := clients[id]
