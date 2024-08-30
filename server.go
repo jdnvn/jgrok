@@ -10,7 +10,7 @@ import (
     "net/http"
 	"strings"
     "github.com/gorilla/websocket"
-	"github.com/matoous/go-nanoid/v2"
+	"github.com/brianvoe/gofakeit/v6"
 )
 
 var upgrader = websocket.Upgrader{
@@ -19,57 +19,54 @@ var upgrader = websocket.Upgrader{
     },
 }
 
-type Client struct {
-    conn *websocket.Conn
-}
-
-type ForwardedRequest struct {
-    Method  string              `json:"method"`
-    URL     string              `json:"url"`
-    Headers map[string][]string `json:"headers"`
-    Body    string              `json:"body"`
-}
-
-type ForwardedResponse struct {
-    StatusCode int               `json:"status_code"`
-    Headers    map[string][]string `json:"headers"`
-    Body       string            `json:"body"`
-}
-
 var clients = make(map[string]*Client)
 var broadcast = make(chan []byte)
 
-// HTTP/WebSocket handler
+func generateUniqueId() string {
+	var id string
+    for {
+        id = strings.ToLower(strings.ReplaceAll(gofakeit.Adjective() + gofakeit.Animal(), " ", ""))
+		_, exists := clients[id]
+        if !exists {
+            break
+        }
+    }
+	return id
+}
+
 func handler(w http.ResponseWriter, r *http.Request) {
-    // Check if this is a WebSocket request
+    // check if this is a websocket request
     if websocket.IsWebSocketUpgrade(r) {
-        // Handle WebSocket upgrade and communication
+        // handle websocket upgrade and communication
         ws, err := upgrader.Upgrade(w, r, nil)
         if err != nil {
-            log.Println("Upgrade:", err)
+            log.Println("error creating websocket connection:", err)
             return
         }
 
-        // Register new WebSocket client
+        // register new websocket client
         client := &Client{conn: ws}
-		nanoId, _ := gonanoid.New()
-		id := strings.ToLower(nanoId)
+
+		// generate unique id to be used as the subdomain and map it to the client's websocket connection
+		id := generateUniqueId()
         clients[id] = client
-		log.Println("New client:", id)
+		log.Println("new client:", id)
 
 		ws.WriteMessage(websocket.TextMessage, []byte(id))
     } else {
 		host := r.Host
 		split_host := strings.Split(host, ".")
-		if (len(split_host) < 3) {
+		if len(split_host) < 3 {
 			w.WriteHeader(http.StatusNotFound)
 			return
 		}
 		id := strings.ToLower(split_host[0])
 		log.Println("Incoming request to id:", id)
 
+		// TODO: respond with JSON
+
 		client, exists := clients[id]
-		if (!exists) {
+		if !exists {
 			w.WriteHeader(http.StatusNotFound)
 			w.Write([]byte("that jgrok URL does not exist"))
 			return
@@ -133,10 +130,10 @@ func handler(w http.ResponseWriter, r *http.Request) {
     }
 }
 
-func cleanup() {
+func purge_clients() {
 	for id, client := range clients {
 		err := client.conn.Close()
-		if (err != nil) {
+		if err != nil {
 			log.Printf("Error closing connection for %s", id)
 		}
 	}
@@ -168,5 +165,5 @@ func main() {
 	}
 
 	// clean up websocket connections
-	cleanup()
+	purge_clients()
 }

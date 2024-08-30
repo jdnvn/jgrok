@@ -2,7 +2,6 @@ package main
 
 import (
 	"bytes"
-	"fmt"
 	"log"
 	"net/url"
 	"os"
@@ -11,17 +10,9 @@ import (
 	"io/ioutil"
 	"encoding/json"
 	"net/http"
-	"strings"
 
 	"github.com/gorilla/websocket"
 )
-
-type ForwardedRequest struct {
-    Method  string              `json:"method"`
-    URL     string              `json:"url"`
-    Headers map[string][]string `json:"headers"`
-    Body    string              `json:"body"`
-}
 
 func main() {
 	args := os.Args
@@ -74,7 +65,7 @@ func main() {
 				log.Println("Error parsing request:", parseErr)
 			} else {
 				bodyReader := bytes.NewReader([]byte(forwardedReq.Body))
-				req, _ := http.NewRequest(forwardedReq.Method, local_server_url, bodyReader)
+				req, _ := http.NewRequest(forwardedReq.Method, local_server_url + forwardedReq.URL, bodyReader)
 
 				for key, values := range forwardedReq.Headers {
 					for _, value := range values {

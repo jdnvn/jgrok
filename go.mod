@@ -5,7 +5,7 @@ go 1.23.0
 require github.com/gorilla/websocket v1.5.3
 
 require (
-	github.com/matoous/go-nanoid/v2 v2.1.0 // indirect
+	github.com/brianvoe/gofakeit/v6 v6.28.0 // indirect
 	github.com/yuin/goldmark v1.4.13 // indirect
 	golang.org/x/crypto v0.14.0 // indirect
 	golang.org/x/mod v0.8.0 // indirect
