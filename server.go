@@ -13,6 +13,8 @@ import (
 	"github.com/brianvoe/gofakeit/v6"
 )
 
+const port = "80"
+
 var upgrader = websocket.Upgrader{
     CheckOrigin: func(r *http.Request) bool {
         return true
@@ -141,7 +143,7 @@ func purge_clients() {
 
 func main() {
 	http.HandleFunc("/", handler)
-	server := &http.Server{Addr: ":8080"}
+	server := &http.Server{Addr: ":" + port}
 
 	// set up channel to listen for interrupt signals
 	quit := make(chan os.Signal, 1)
@@ -149,7 +151,7 @@ func main() {
 
 	// run server in a goroutine
 	go func() {
-		log.Println("HTTP server started on :8080")
+		log.Printf("HTTP server started on port %s", port)
 		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			log.Fatalf("HTTP server error: %v", err)
 		}

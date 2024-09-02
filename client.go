@@ -14,22 +14,25 @@ import (
 	"github.com/gorilla/websocket"
 )
 
+const PublicServerHost = "kimiko.me"
+
 func main() {
 	args := os.Args
 
-	port := ""
+	localPort := ""
 	if (len(args) > 1) {
-		port = args[1]
+		localPort = args[1]
 	} else {
 		log.Fatal("You must provide the port of a local running HTTP server")
 		return
 	}
 
-	local_server_url := "http://localhost:" + port
+	// TODO: verify port/if server is running on that port
+
+	localServerHost := "http://localhost:" + localPort
 
 	// connect to the websocket server
-	host := "kimiko.me:8080"
-	u := url.URL{Scheme: "ws", Host: host}
+	u := url.URL{Scheme: "ws", Host: PublicServerHost}
 	c, _, err := websocket.DefaultDialer.Dial(u.String(), nil)
 	if err != nil {
 		log.Fatal("Dial error:", err)
@@ -42,7 +45,7 @@ func main() {
 
 	// read ID and print to user
 	_, id, err := c.ReadMessage()
-	log.Printf("%s.%s -> %s", string(id), host, local_server_url)
+	log.Printf("%s.%s -> %s", string(id), PublicServerHost, localServerHost)
 
 	client := &http.Client{}
 
