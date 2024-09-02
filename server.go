@@ -102,7 +102,7 @@ func handler(w http.ResponseWriter, r *http.Request) {
 			delete(clients, id)
 			return
 		}
-		log.Println("reply from client: ", string(msg))
+		log.Println("received reply from client, forwarding...")
 
 		// deserialize the response from the client and respond with correct type and status code
 		var forwardedResp ForwardedResponse
