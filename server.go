@@ -1,61 +1,65 @@
 package main
 
 import (
-	"os"
-    "os/signal"
-	"syscall"
 	"encoding/json"
-	"io/ioutil"
-    "log"
-    "net/http"
+	"io"
+	"log"
+	"net/http"
+	"os"
+	"os/signal"
 	"strings"
-    "github.com/gorilla/websocket"
+	"syscall"
+
 	"github.com/brianvoe/gofakeit/v6"
+	"github.com/gorilla/websocket"
 )
 
-const port = "80"
+const Port = "80"
 
 var upgrader = websocket.Upgrader{
-    CheckOrigin: func(r *http.Request) bool {
-        return true
-    },
+	CheckOrigin: func(r *http.Request) bool {
+		return true
+	},
 }
 
 var clients = make(map[string]*Client)
-var broadcast = make(chan []byte)
 
 func generateUniqueId() string {
 	var id string
-    for {
-        id = strings.ToLower(strings.ReplaceAll(gofakeit.Adjective() + gofakeit.Animal(), " ", ""))
+	for {
+		id = strings.ToLower(strings.ReplaceAll(gofakeit.Adjective()+gofakeit.Animal(), " ", ""))
 		_, exists := clients[id]
-        if !exists {
-            break
-        }
-    }
+		if !exists {
+			break
+		}
+	}
 	return id
 }
 
 func handler(w http.ResponseWriter, r *http.Request) {
-    // check if this is a websocket request
-    if websocket.IsWebSocketUpgrade(r) {
-        // handle websocket upgrade and communication
-        ws, err := upgrader.Upgrade(w, r, nil)
-        if err != nil {
-            log.Println("error creating websocket connection:", err)
-            return
-        }
+	// check if this is a websocket request
+	if websocket.IsWebSocketUpgrade(r) {
+		// handle websocket upgrade and communication
+		ws, err := upgrader.Upgrade(w, r, nil)
+		if err != nil {
+			log.Println("error creating websocket connection:", err)
+			return
+		}
 
-        // register new websocket client
-        client := &Client{conn: ws}
+		// register new websocket client
+		client := &Client{conn: ws}
 
 		// generate unique id to be used as the subdomain and map it to the client's websocket connection
 		id := generateUniqueId()
-        clients[id] = client
+		clients[id] = client
 		log.Println("new client:", id)
 
-		ws.WriteMessage(websocket.TextMessage, []byte(id))
-    } else {
+		err = ws.WriteMessage(websocket.TextMessage, []byte(id))
+		if err != nil {
+			log.Println("error sending client id:", err)
+			return
+		}
+	} else {
 		host := r.Host
 		split_host := strings.Split(host, ".")
 		if len(split_host) < 3 {
@@ -63,19 +67,26 @@ func handler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		id := strings.ToLower(split_host[0])
-		log.Println("Incoming request to id:", id)
+		log.Println("incoming request to id:", id)
 
 		// TODO: respond with JSON
 
 		client, exists := clients[id]
 		if !exists {
 			w.WriteHeader(http.StatusNotFound)
-			w.Write([]byte("that jgrok URL does not exist"))
+			_, err := w.Write([]byte("that jgrok URL does not exist"))
+			if err != nil {
+				log.Println("failed to respond to request", err)
+			}
 			return
 		}
 
 		// serialize and forward request to client
-		body, err := ioutil.ReadAll(r.Body)
+		body, err := io.ReadAll(r.Body)
+		if err != nil {
+			log.Println("error reading incoming request body", err)
+			return
+		}
 		forwardedReq := ForwardedRequest{
 			Method:  r.Method,
 			URL:     r.URL.String(),
@@ -84,20 +95,31 @@ func handler(w http.ResponseWriter, r *http.Request) {
 		}
 		forwardedRequestJson, err := json.Marshal(forwardedReq)
 		if err != nil {
-			log.Println("Error marshaling request data:", err)
+			log.Println("error marshaling request data:", err)
 			w.WriteHeader(http.StatusInternalServerError)
-			w.Write([]byte("internal server error :("))
+			_, err = w.Write([]byte("internal server error :("))
+			if err != nil {
+				log.Println("failed to respond to request", err)
+			}
 			return
 		}
 
 		log.Println("message to client:", string(forwardedRequestJson))
-		client.conn.WriteMessage(websocket.TextMessage, forwardedRequestJson)
+
+		err = client.conn.WriteMessage(websocket.TextMessage, forwardedRequestJson)
+		if err != nil {
+			log.Println("error forwarding request to client", err)
+			return
+		}
 
 		_, msg, err := client.conn.ReadMessage()
 		if err != nil {
-			log.Println("Error reading WebSocket message:", err)
+			log.Println("error reading websocket message:", err)
 			w.WriteHeader(http.StatusNotFound)
-			w.Write([]byte("that jgrok URL does not exist"))
+			_, err = w.Write([]byte("that jgrok URL does not exist"))
+			if err != nil {
+				log.Println("failed to respond to request", err)
+			}
 			client.conn.Close()
 			delete(clients, id)
 			return
@@ -108,9 +130,12 @@ func handler(w http.ResponseWriter, r *http.Request) {
 		var forwardedResp ForwardedResponse
 		err = json.Unmarshal(msg, &forwardedResp)
 		if err != nil {
-			log.Println("Error unmarshaling response data:", err)
+			log.Println("error unmarshaling response data:", err)
 			w.WriteHeader(http.StatusInternalServerError)
-			w.Write([]byte("internal server error :("))
+			_, err = w.Write([]byte("internal server error :("))
+			if err != nil {
+				log.Println("failed to respond to request", err)
+			}
 			return
 		}
 
@@ -128,8 +153,12 @@ func handler(w http.ResponseWriter, r *http.Request) {
 		}
 
 		// write the response body
-		w.Write(forwardedResp.Body)
-    }
+		_, err = w.Write(forwardedResp.Body)
+		if err != nil {
+			log.Println("error forwarding response to caller")
+			return
+		}
+	}
 }
 
 func purge_clients() {
@@ -143,7 +172,7 @@ func purge_clients() {
 
 func main() {
 	http.HandleFunc("/", handler)
-	server := &http.Server{Addr: ":" + port}
+	server := &http.Server{Addr: ":" + Port}
 
 	// set up channel to listen for interrupt signals
 	quit := make(chan os.Signal, 1)
@@ -151,7 +180,7 @@ func main() {
 
 	// run server in a goroutine
 	go func() {
-		log.Printf("HTTP server started on port %s", port)
+		log.Printf("HTTP server started on port %s", Port)
 		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			log.Fatalf("HTTP server error: %v", err)
 		}

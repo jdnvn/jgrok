@@ -2,14 +2,14 @@ package main
 
 import (
 	"bytes"
+	"encoding/json"
+	"io"
 	"log"
+	"net/http"
 	"net/url"
 	"os"
 	"os/signal"
 	"time"
-	"io/ioutil"
-	"encoding/json"
-	"net/http"
 
 	"github.com/gorilla/websocket"
 )
@@ -20,7 +20,7 @@ func main() {
 	args := os.Args
 
 	localPort := ""
-	if (len(args) > 1) {
+	if len(args) > 1 {
 		localPort = args[1]
 	} else {
 		log.Fatal("You must provide the port of a local running HTTP server")
@@ -45,6 +45,10 @@ func main() {
 
 	// read ID and print to user
 	_, id, err := c.ReadMessage()
+	if err != nil {
+		log.Println("error receiving id from server", err)
+		return
+	}
 	log.Printf("%s.%s -> %s", string(id), PublicServerHost, localServerHost)
 
 	client := &http.Client{}
@@ -64,11 +68,11 @@ func main() {
 
 			var forwardedReq ForwardedRequest
 			parseErr := json.Unmarshal(message, &forwardedReq)
-			if (parseErr != nil) {
+			if parseErr != nil {
 				log.Println("Error parsing request:", parseErr)
 			} else {
 				bodyReader := bytes.NewReader([]byte(forwardedReq.Body))
-				req, _ := http.NewRequest(forwardedReq.Method, localServerHost + forwardedReq.URL, bodyReader)
+				req, _ := http.NewRequest(forwardedReq.Method, localServerHost+forwardedReq.URL, bodyReader)
 
 				for key, values := range forwardedReq.Headers {
 					for _, value := range values {
@@ -77,7 +81,7 @@ func main() {
 				}
 
 				resp, _ := client.Do(req)
-				body, _ := ioutil.ReadAll(resp.Body)
+				body, _ := io.ReadAll(resp.Body)
 
 				forwardedResp := ForwardedResponse{
 					StatusCode: resp.StatusCode,
@@ -91,7 +95,11 @@ func main() {
 					return
 				}
 
-				c.WriteMessage(websocket.TextMessage, responseJson)
+				err = c.WriteMessage(websocket.TextMessage, responseJson)
+				if err != nil {
+					log.Println("Error writing response to socket:", err)
+					return
+				}
 			}
 		}
 	}()
