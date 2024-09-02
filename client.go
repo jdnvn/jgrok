@@ -14,7 +14,7 @@ import (
 	"github.com/gorilla/websocket"
 )
 
-const PublicServerHost = "kimiko.me"
+const PublicServerHost = "lvh.me"
 
 func main() {
 	args := os.Args
@@ -60,7 +60,7 @@ func main() {
 				return
 			}
 
-			log.Printf("Received: %s, forwarding to local server", message)
+			log.Printf("Received: %s, forwarding to local server...", message)
 
 			var forwardedReq ForwardedRequest
 			parseErr := json.Unmarshal(message, &forwardedReq)
@@ -79,15 +79,19 @@ func main() {
 				resp, _ := client.Do(req)
 				body, _ := ioutil.ReadAll(resp.Body)
 
-				responseMap := map[string]interface{}{
-					"status_code": resp.StatusCode,
-					"headers":     resp.Header,
-					"body":        string(body),
+				forwardedResp := ForwardedResponse{
+					StatusCode: resp.StatusCode,
+					Headers:    resp.Header,
+					Body:       body,
 				}
 
-				responseJson, _ := json.MarshalIndent(responseMap, "", "  ")
+				responseJson, err := json.Marshal(forwardedResp)
+				if err != nil {
+					log.Println("Error marshaling response:", err)
+					return
+				}
 
-				c.WriteMessage(websocket.TextMessage, []byte(responseJson))
+				c.WriteMessage(websocket.TextMessage, responseJson)
 			}
 		}
 	}()

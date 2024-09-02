@@ -80,7 +80,7 @@ func handler(w http.ResponseWriter, r *http.Request) {
 			Method:  r.Method,
 			URL:     r.URL.String(),
 			Headers: r.Header,
-			Body:    string(body),
+			Body:    body,
 		}
 		forwardedRequestJson, err := json.Marshal(forwardedReq)
 		if err != nil {
@@ -126,9 +126,9 @@ func handler(w http.ResponseWriter, r *http.Request) {
 		if forwardedResp.Headers["Content-Type"] == nil {
 			w.Header().Set("Content-Type", "application/json")
 		}
-	
+
 		// write the response body
-		w.Write([]byte(forwardedResp.Body))
+		w.Write(forwardedResp.Body)
     }
 }
 
