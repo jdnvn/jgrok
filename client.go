@@ -68,7 +68,7 @@ func main() {
 				log.Println("Error parsing request:", parseErr)
 			} else {
 				bodyReader := bytes.NewReader([]byte(forwardedReq.Body))
-				req, _ := http.NewRequest(forwardedReq.Method, local_server_url + forwardedReq.URL, bodyReader)
+				req, _ := http.NewRequest(forwardedReq.Method, localServerHost + forwardedReq.URL, bodyReader)
 
 				for key, values := range forwardedReq.Headers {
 					for _, value := range values {
