@@ -30,11 +30,11 @@ func createUI(id string, localServerHost string) *UI {
 	app := tview.NewApplication()
 
 	title := tview.NewTextView()
-	title.SetText(" [blue]jgrok[-]")
-	title.SetDynamicColors(true)
+	title.SetText(" jgrok")
+	title.SetTextColor(tcell.ColorDarkCyan)
 
 	forwarding := tview.NewTextView()
-	forwarding.SetText(fmt.Sprintf(" %s.%s [yellow]->[-] %s", string(id), PublicServerHost, localServerHost))
+	forwarding.SetText(fmt.Sprintf(" http://%s.%s [yellow]->[-] %s", string(id), PublicServerHost, localServerHost))
 	forwarding.SetDynamicColors(true)
 
 	spacer := tview.NewTextView()
@@ -43,6 +43,7 @@ func createUI(id string, localServerHost string) *UI {
 
 	requests := tview.NewFlex()
 	requests.SetTitle("requests")
+	requests.SetTitleColor(tcell.ColorLightPink)
 	requests.SetTitleAlign(tview.AlignLeft)
 	requests.SetDirection(tview.FlexRow)
 	requests.SetBorder(true)
@@ -70,7 +71,7 @@ func (ui *UI) addTableRow(httpMethod string, path string, statusCode int) {
 	ui.table.SetCell(ui.rows, 2, tview.NewTableCell(path))
 	statusCodeCell := tview.NewTableCell(strconv.Itoa(statusCode))
 	if statusCode >= 400 {
-		statusCodeCell.SetTextColor(tcell.ColorRed)
+		statusCodeCell.SetTextColor(tcell.ColorIndianRed)
 	}
 	ui.table.SetCell(ui.rows, 3, statusCodeCell)
 	ui.app.Draw()
