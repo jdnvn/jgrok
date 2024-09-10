@@ -170,7 +170,7 @@ func purge_clients() {
 	}
 }
 
-func main() {
+func startServer() {
 	http.HandleFunc("/", handler)
 	server := &http.Server{Addr: ":" + Port}
 
@@ -180,13 +180,12 @@ func main() {
 
 	// run server in a goroutine
 	go func() {
-		log.Printf("HTTP server started on port %s", Port)
 		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			log.Fatalf("HTTP server error: %v", err)
 		}
+		log.Printf("HTTP server started on port %s", Port)
 	}()
 
-	// wait for interrupt signal
 	<-quit
 
 	// handle shutdown
@@ -195,6 +194,6 @@ func main() {
 		log.Fatalf("Error shutting down server: %v", err)
 	}
 
-	// clean up websocket connections
+	// clean up active websocket connections
 	purge_clients()
 }

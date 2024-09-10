@@ -90,20 +90,39 @@ func deserializeMessage(message []byte) (*ForwardedRequest, error) {
 	return &forwardedReq, err
 }
 
-func main() {
+func verifyServerRunning(localServerHost string) bool {
+	client := &http.Client{
+		Timeout: 2 * time.Second,
+	}
+
+	resp, err := client.Head(localServerHost)
+	if err != nil {
+		return false
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode >= 200 && resp.StatusCode < 300 {
+		return true
+	}
+
+	return false
+}
+
+func startClient() {
+	log.SetFlags(0)
 	args := os.Args
 
 	localPort := ""
-	if len(args) > 1 {
-		localPort = args[1]
+	if len(args) > 2 {
+		localPort = args[2]
 	} else {
-		log.Fatal("You must provide the port of a local running HTTP server")
-		return
+		log.Fatal("you must provide the port of a local running HTTP server")
 	}
 
-	// TODO: verify port/if server is running on that port
-
 	localServerHost := "http://localhost:" + localPort
+	if !verifyServerRunning(localServerHost) {
+		log.Fatalf("no server running on port %s", localPort)
+	}
 
 	// connect to the websocket server
 	conn, err := connectToServer()
