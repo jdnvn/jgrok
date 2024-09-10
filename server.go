@@ -36,10 +36,21 @@ func generateUniqueId() string {
 	return id
 }
 
+func httpError(w http.ResponseWriter, statusCode int, message string) {
+	log.Printf("ERROR: %s - %s", statusCode, message)
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	w.Header().Set("X-Content-Type-Options", "nosniff")
+	w.WriteHeader(statusCode)
+	errorResponse := map[string]string{
+		"error": message,
+	}
+	json.NewEncoder(w).Encode(errorResponse)
+}
+
 func handler(w http.ResponseWriter, r *http.Request) {
 	// check if this is a websocket request
 	if websocket.IsWebSocketUpgrade(r) {
-		// handle websocket upgrade and communication
+		// handle websocket upgrade
 		ws, err := upgrader.Upgrade(w, r, nil)
 		if err != nil {
 			log.Println("error creating websocket connection:", err)
@@ -73,17 +84,14 @@ func handler(w http.ResponseWriter, r *http.Request) {
 
 		client, exists := clients[id]
 		if !exists {
-			w.WriteHeader(http.StatusNotFound)
-			_, err := w.Write([]byte("that jgrok URL does not exist"))
-			if err != nil {
-				log.Println("failed to respond to request", err)
-			}
+			httpError(w, http.StatusNotFound, "that jgrok URL does not exist!")
 			return
 		}
 
 		// serialize and forward request to client
 		body, err := io.ReadAll(r.Body)
 		if err != nil {
+			httpError(w, http.StatusBadRequest, "bad request!")
 			log.Println("error reading incoming request body", err)
 			return
 		}
@@ -95,12 +103,8 @@ func handler(w http.ResponseWriter, r *http.Request) {
 		}
 		forwardedRequestJson, err := json.Marshal(forwardedReq)
 		if err != nil {
+			httpError(w, http.StatusBadRequest, "bad request!")
 			log.Println("error marshaling request data:", err)
-			w.WriteHeader(http.StatusInternalServerError)
-			_, err = w.Write([]byte("internal server error :("))
-			if err != nil {
-				log.Println("failed to respond to request", err)
-			}
 			return
 		}
 
@@ -108,34 +112,27 @@ func handler(w http.ResponseWriter, r *http.Request) {
 
 		err = client.conn.WriteMessage(websocket.TextMessage, forwardedRequestJson)
 		if err != nil {
+			httpError(w, http.StatusBadGateway, "could not reach server")
 			log.Println("error forwarding request to client", err)
 			return
 		}
 
 		_, msg, err := client.conn.ReadMessage()
 		if err != nil {
-			log.Println("error reading websocket message:", err)
-			w.WriteHeader(http.StatusNotFound)
-			_, err = w.Write([]byte("that jgrok URL does not exist"))
-			if err != nil {
-				log.Println("failed to respond to request", err)
-			}
+			httpError(w, http.StatusNotFound, "that jgrok URL does not exist!")
+			log.Println("error reading response from client:", err)
 			client.conn.Close()
 			delete(clients, id)
 			return
 		}
+
 		log.Println("received reply from client, forwarding...")
 
 		// deserialize the response from the client and respond with correct type and status code
 		var forwardedResp ForwardedResponse
 		err = json.Unmarshal(msg, &forwardedResp)
 		if err != nil {
-			log.Println("error unmarshaling response data:", err)
-			w.WriteHeader(http.StatusInternalServerError)
-			_, err = w.Write([]byte("internal server error :("))
-			if err != nil {
-				log.Println("failed to respond to request", err)
-			}
+			httpError(w, http.StatusInternalServerError, "internal server error :(")
 			return
 		}
 
@@ -155,17 +152,18 @@ func handler(w http.ResponseWriter, r *http.Request) {
 		// write the response body
 		_, err = w.Write(forwardedResp.Body)
 		if err != nil {
-			log.Println("error forwarding response to caller")
+			log.Println("error forwarding response to caller", err)
 			return
 		}
 	}
 }
 
 func purge_clients() {
+	log.Println("purging clients...")
 	for id, client := range clients {
 		err := client.conn.Close()
 		if err != nil {
-			log.Printf("Error closing connection for %s", id)
+			log.Printf("error closing connection for %s", id)
 		}
 	}
 }
@@ -181,7 +179,7 @@ func startServer() {
 	// run server in a goroutine
 	go func() {
 		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			log.Fatalf("HTTP server error: %v", err)
+			log.Fatalf("server error: %v", err)
 		}
 		log.Printf("HTTP server started on port %s", Port)
 	}()
